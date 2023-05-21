@@ -1,65 +1,78 @@
-from flask import Flask, render_template, redirect, url_for, session
+from flask import Flask, render_template, redirect, url_for, session, jsonify
 from authlib.integrations.flask_client import OAuth
 import configparser
+import logging
 
-app = Flask(__name__)
+def create_app():
+    app = Flask(__name__)
 
-# Read secrets and configuration values from creds_config.txt
-config = configparser.ConfigParser()
-config.read("creds_config.txt")
+    # Read secrets and configuration values from creds_config.txt
+    config = configparser.ConfigParser()
+    config.read("creds_config.txt")
 
-app.secret_key = config.get("secrets", "flask_secret_key")
+    app.secret_key = config.get("secrets", "flask_secret_key")
 
-oauth = OAuth(app)
+    oauth = OAuth(app)
 
-# Spotify configuration
-spotify = oauth.register(
-    name="spotify",
-    client_id=config.get("secrets", "spotify_client_id"),
-    client_secret=config.get("secrets", "spotify_client_secret"),
-    access_token_url="https://accounts.spotify.com/api/token",
-    access_token_params=None,
-    authorize_url="https://accounts.spotify.com/authorize",
-    authorize_params=None,
-    api_base_url="https://api.spotify.com/v1/",
-    client_kwargs={"scope": "user-read-private playlist-read-private"},
-)
+    # Spotify configuration
+    spotify = oauth.register(
+        name="spotify",
+        client_id=config.get("secrets", "spotify_client_id"),
+        client_secret=config.get("secrets", "spotify_client_secret"),
+        access_token_url="https://accounts.spotify.com/api/token",
+        access_token_params=None,
+        authorize_url="https://accounts.spotify.com/authorize",
+        authorize_params=None,
+        api_base_url="https://api.spotify.com/v1/",
+        client_kwargs={"scope": "user-read-private playlist-read-private"},
+        redirect_uri="http://127.0.0.1:5000/callback"
+    )
 
+    # Configure logging
+    logging.basicConfig(filename='error.log', level=logging.DEBUG)
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+    @app.route("/")
+    def index():
+        return render_template("index.html")
 
+    @app.route("/login")
+    def login():
+        return spotify.authorize_redirect(url_for("authorize", _external=True))
 
-@app.route("/login")
-def login():
-    redirect_uri = url_for("authorize", _external=True)
-    return spotify.authorize_redirect(redirect_uri)
+    @app.route("/callback")
+    def authorize():
+        try:
+            token = spotify.authorize_access_token()
+            if token:
+                session["token"] = token
+                return redirect(url_for("playlists"))
+            else:
+                return "Authorization failed."
+        except Exception as e:
+            logging.exception("Error in authorize callback:")
+            return jsonify(error="An internal server error occurred. Please try again later.")
 
+    @app.route("/playlists")
+    def playlists():
+        try:
+            if "token" not in session:
+                return redirect(url_for("login"))
 
-@app.route("/authorize")
-def authorize():
-    token = spotify.authorize_access_token()
-    if token:
-        session["token"] = token
-        return redirect(url_for("playlists"))
-    else:
-        return "Authorization failed."
+            token = session["token"]
+            resp = spotify.get("me/playlists", token=token)
+            playlists = resp.json()["items"]
 
+            playlist_names = [playlist["name"] for playlist in playlists]
 
-@app.route("/playlists")
-def playlists():
-    if "token" in session:
-        resp = spotify.get("me/playlists")
-        if resp.ok:
-            data = resp.json()
-            playlists = data["items"]
-            return render_template("playlists.html", playlists=playlists)
-        else:
-            return "Failed to fetch playlists."
-    else:
-        return redirect(url_for("login"))
+            return render_template("playlists.html", playlists=playlist_names)
+
+        except Exception as e:
+            logging.exception("Error in playlists route:")
+            return jsonify(error="An internal server error occurred. Please try again later.")
+
+    return app
 
 
 if __name__ == "__main__":
+    app = create_app()
     app.run(debug=True)

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Playlists</title>
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="container">
+    <h1>My Playlists</h1>
+    <ul id="playlist-list">
+      {% for playlist in playlists %}
+        <li class="playlist-item">{{ playlist }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</body>
+</html>
