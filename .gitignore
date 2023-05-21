@@ -160,4 +160,4 @@ cython_debug/
 #.idea/
 
 # Configuration variables
-config.txt
+creds_config.txt
