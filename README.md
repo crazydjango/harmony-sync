@@ -1,2 +1,2 @@
-# harmony-sync
+# HarmonySync
 Experiments with Spotify
