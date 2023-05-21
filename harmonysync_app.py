@@ -25,7 +25,7 @@ def create_app():
         authorize_params=None,
         api_base_url="https://api.spotify.com/v1/",
         client_kwargs={"scope": "user-read-private playlist-read-private"},
-        redirect_uri="http://127.0.0.1:5000/callback"
+        redirect_uri=config.get("redirect_uris", "production")
     )
 
     # Configure logging
@@ -75,4 +75,4 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port='5000', debug=True)
